@@ -6,4 +6,6 @@ lazy val `daily-info-api` = (project in file(".")).enablePlugins(PlayScala)
       
 scalaVersion := "2.12.2"
 
-libraryDependencies ++= Seq(ws)
+libraryDependencies ++= Seq(
+  ws,
+  "io.monix" %% "monix" % "2.3.3")
