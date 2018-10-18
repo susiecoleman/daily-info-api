@@ -15,3 +15,7 @@ news-api-key="my key"
 `sbt run`
 This will run the app locally on port 9000
 [http://localhost:9000/](http://localhost:9000/)
+
+### TODO
+* Improve cache
+* Use http4s using tasks [https://http4s.org/v0.18/client/](https://http4s.org/v0.18/client/)
