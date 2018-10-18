@@ -1,1 +1,1 @@
-GET     /                           controllers.App.index()
+GET     /                           controllers.App.index(q: String ?= "")

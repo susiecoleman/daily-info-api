@@ -9,18 +9,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class NewsApi(val ws: WSClient, val config: Config) {
 
-  val cache = Map.empty[String, Article]
+  var cache = Map.empty[String, Article]
 
-  def getArticle: Task[Article] = {
+  def getArticle(q: String): Task[Article] = {
     val request = ws.url("https://newsapi.org/v2/top-headlines")
       .addQueryStringParameters(
         "country" -> "gb",
+        "q" -> q,
         "apiKey" -> config.newsApiKey)
 
-    val url = request.url
-      request.addHttpHeaders("Accept" -> "application/json")
-    cache.get(url).map(Task(_)).getOrElse(Task.fromFuture(request.get.map(response => {
-      response.json.as[NewsApiResponse].articles.head
+    request.addHttpHeaders("Accept" -> "application/json")
+    cache.get(q).map(Task(_)).getOrElse(Task.fromFuture(request.get.map(response => {
+      val article: Article = response.json.as[NewsApiResponse].articles.head
+      cache = cache + (q -> article)
+      article
     })))
   }
 }
