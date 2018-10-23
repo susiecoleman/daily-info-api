@@ -8,4 +8,6 @@ scalaVersion := "2.12.2"
 
 libraryDependencies ++= Seq(
   ws,
-  "io.monix" %% "monix" % "2.3.3")
+  "io.monix" %% "monix" % "2.3.3",
+  "org.scalatest" %% "scalatest" % "3.0.5" % Test
+)
