@@ -4,62 +4,83 @@ import java.sql.{Timestamp => SQLTimestamp}
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
+import cats.effect.Effect
 import config.Config
-import models.{Article, NewsApiResponse}
+import models.{Article, NewsApiResponse, Source}
 import monix.eval.Task
 import monix.eval.TaskCircuitBreaker.Timestamp
+import org.http4s.Uri
 import play.api.libs.ws.WSClient
+import org.http4s.client.blaze._
+// import org.http4s.client.blaze._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import monix.execution.Scheduler.{global => scheduler}
+import org.http4s.client._
+// import org.http4s.client._
 
-class NewsApi(val ws: WSClient, val config: Config) {
+
+
+
+
+
+class NewsApi[F[_]](val config: Config)(implicit F: Effect[F]) {
+
+  val httpClientF: F[Client[F]] = Http1Client[F]()
 
   val cache = new Cache[Article]
 
-  def getArticle(q: String): Task[Article] = {
-    val request = ws.url("https://newsapi.org/v2/top-headlines")
-      .addQueryStringParameters(
-        "country" -> "gb",
-        "q" -> q,
-        "apiKey" -> config.newsApiKey)
+  def getArticle(q: String): F[Article] = {
+//    val request = ws.url("https://newsapi.org/v2/top-headlines")
+//      .addQueryStringParameters(
+//        "country" -> "gb",
+//        "q" -> q,
+//        "apiKey" -> config.newsApiKey)
 
-    request.addHttpHeaders("Accept" -> "application/json")
-    cache.get(q).map(Task(_)).getOrElse(Task.fromFuture(request.get.map(response => {
-      println("Hitting api")
-      val article: Article = response.json.as[NewsApiResponse].articles.head
-      cache.put(q, article)
-      article
-    })))
+    val url = Uri.uri("http://localhost:8080/hello/") +? ("country", "gb") +? ("q", q) +? ("apiKey", config.newsApiKey)
+
+    httpClientF
+
+    val r2 = for {
+      client <- httpClientF
+    } yield client
+
+    F.delay(Article("a", Source("b")))
+
+//    request.addHttpHeaders("Accept" -> "application/json")
+//    cache.get(q).map(F.delay(_)).getOrElse(F.fromFuture(request.get.map(response => {
+//      val article: Article = response.json.as[NewsApiResponse].articles.head
+//      cache.put(q, article)
+//      article
+//    })))
   }
 }
 
 
 case class CacheItem[A](timestamp: SQLTimestamp, item: A)
 
-class Cache[A](val ttlInSeconds: Int = 15, now: => SQLTimestamp = SQLTimestamp.valueOf(LocalDateTime.now())) {
+class Cache[A](val ttlInSeconds: Int = 15, val initialCache: Map[String, CacheItem[A]] = Map.empty[String, CacheItem[A]]) {
 
-
-
-  private var cache = Map.empty[String, CacheItem[A]]
+  private def now() = SQLTimestamp.valueOf(LocalDateTime.now())
+  private var cache = initialCache
 
   def get(key: String): Option[A] = {
-    println(cache)
-    cache.get(key).map(_.item)
+    cache.get(key).filter(isFresh).map(_.item)
+
   }
 
-  def put(key: String, article: A, putNow: => SQLTimestamp = now) = {
-
-    cache = cache + (key -> CacheItem(putNow , article))
+  private def isFresh(item: CacheItem[A]): Boolean = {
+    val limit = new SQLTimestamp(now().getTime - ttlInSeconds * 1000)
+    item.timestamp.after(limit)
   }
 
+  def put(key: String, article: A) = {
+    cache = cache + (key -> CacheItem(now() , article))
+  }
 
   private val c = scheduler.scheduleWithFixedDelay(
-    1, 1, TimeUnit.SECONDS,
+    10, 10, TimeUnit.SECONDS,
     new Runnable {
       def run(): Unit = {
-        val limit = new SQLTimestamp(now.getTime - ttlInSeconds * 1000)
-        cache = cache.filter{ case (_, item) => item.timestamp.after(limit) }
+        cache = cache.filter{ case (_, item) => isFresh(item) }
       }
     })
 
