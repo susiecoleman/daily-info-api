@@ -4,53 +4,50 @@ import java.sql.{Timestamp => SQLTimestamp}
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
-import cats.effect.Effect
 import config.Config
-import models.{Article, NewsApiResponse, Source}
+import models.{Article, NewsApiResponse}
 import monix.eval.Task
-import monix.eval.TaskCircuitBreaker.Timestamp
+import play.api.libs.ws._
+
 import org.http4s.Uri
-import play.api.libs.ws.WSClient
-import org.http4s.client.blaze._
-// import org.http4s.client.blaze._
+//import cats.effect.Effect
+//import org.http4s.client.blaze._
+//import org.http4s.client._
+//import cats._
+//import cats.effect._
+//import cats.implicits._
 
-import org.http4s.client._
-// import org.http4s.client._
+import scala.concurrent.ExecutionContext.Implicits.global
+import monix.execution.Scheduler.{global => scheduler}
 
+class NewsApi(val config: Config, val ws: WSClient) {
 
-
-
-
-
-class NewsApi[F[_]](val config: Config)(implicit F: Effect[F]) {
-
-  val httpClientF: F[Client[F]] = Http1Client[F]()
+//  // I don't see a way to do this without implementing Effect[Task]
+//  implicit val taskEffect: Effect[Task] = ???
+//
+//    //From the docs. Uses IO from the cats library which is equivalent to Task
+//  val httpClientF = Http1Client[IO]()
+//
+//    //In the case of Task
+//    val httpClientF2 = Http1Client[Task]()
 
   val cache = new Cache[Article]
 
-  def getArticle(q: String): F[Article] = {
-//    val request = ws.url("https://newsapi.org/v2/top-headlines")
-//      .addQueryStringParameters(
-//        "country" -> "gb",
-//        "q" -> q,
-//        "apiKey" -> config.newsApiKey)
+  def getArticle(q: String): Task[Article] = {
+    val request = ws.url("https://newsapi.org/v2/top-headlines")
+      .addQueryStringParameters(
+        "country" -> "gb",
+        "q" -> q,
+        "apiKey" -> config.newsApiKey)
 
     val url = Uri.uri("http://localhost:8080/hello/") +? ("country", "gb") +? ("q", q) +? ("apiKey", config.newsApiKey)
 
-    httpClientF
-
-    val r2 = for {
-      client <- httpClientF
-    } yield client
-
-    F.delay(Article("a", Source("b")))
-
-//    request.addHttpHeaders("Accept" -> "application/json")
-//    cache.get(q).map(F.delay(_)).getOrElse(F.fromFuture(request.get.map(response => {
-//      val article: Article = response.json.as[NewsApiResponse].articles.head
-//      cache.put(q, article)
-//      article
-//    })))
+    request.addHttpHeaders("Accept" -> "application/json")
+    cache.get(q).map(Task(_)).getOrElse(Task.fromFuture(request.get.map(response => {
+      val article: Article = response.json.as[NewsApiResponse].articles.head
+      cache.put(q, article)
+      article
+    })))
   }
 }
 
