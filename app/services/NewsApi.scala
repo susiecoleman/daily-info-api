@@ -19,6 +19,7 @@ import cats.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import monix.execution.Scheduler.{global => scheduler}
+import monix.execution.Scheduler.Implicits.global
 
 class NewsApi(val config: Config, val ws: WSClient) {
 
@@ -52,7 +53,7 @@ class NewsApi(val config: Config, val ws: WSClient) {
     val httpClientF: IO[Client[IO]] = Http1Client[IO]()
 
 //    I don't see a way to do this without implementing Effect[Task]
-    implicit val taskEffect: Effect[Task] = ???
+//    implicit val taskEffect: Effect[Task] = ???
 
 //    In the case of Task There is no Effect[Task] provided. Implement this manually?
     val httpClientF2: Task[String] = Http1Client[Task]()
