@@ -12,6 +12,6 @@ class AppComponents(context: Context) extends BuiltInComponentsFromContext(conte
   lazy val router: Router = new Routes(httpErrorHandler, appController)
 
   lazy val config = new Config(configuration)
-  lazy val newsApi = new NewsApi(config, wsClient)
+  lazy val newsApi = new NewsApi(config)
   lazy val appController = new controllers.App(controllerComponents, newsApi)
 }

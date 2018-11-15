@@ -5,61 +5,29 @@ import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
 import config.Config
+import io.circe.generic.auto._
 import models.{Article, NewsApiResponse}
 import monix.eval.Task
-import play.api.libs.ws._
-
-import org.http4s.Uri
-import cats.effect.Effect
-import org.http4s.client.blaze._
-import org.http4s.client._
-import cats._
-import cats.effect._
-import cats.implicits._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import monix.execution.Scheduler.{global => scheduler}
 import monix.execution.Scheduler.Implicits.global
+import monix.execution.Scheduler.{global => scheduler}
+import org.http4s.Uri
+import org.http4s.circe._
+import org.http4s.client.blaze._
 
-class NewsApi(val config: Config, val ws: WSClient) {
+class NewsApi(val config: Config) {
 
   val cache = new Cache[Article]
 
   def getArticle(q: String): Task[Article] = {
-    val request = ws.url("https://newsapi.org/v2/top-headlines")
-      .addQueryStringParameters(
-        "country" -> "gb",
-        "q" -> q,
-        "apiKey" -> config.newsApiKey)
-
-    request.addHttpHeaders("Accept" -> "application/json")
-    cache.get(q).map(Task(_)).getOrElse(Task.fromFuture(request.get.map(response => {
-      val article: Article = response.json.as[NewsApiResponse].articles.head
-      cache.put(q, article)
-      article
-    })))
-  }
-
-  def getArticleUsingHttp4s(q: String): Task[Article] = {
-    val url = Uri.uri("http://localhost:8080/hello/") +?
+    val url = Uri.uri("https://newsapi.org/v2/top-headlines") +?
       ("country", "gb") +?
       ("q", q) +?
       ("apiKey", config.newsApiKey)
 
-//    From the docs. https://http4s.org/v1.0/client/.
-//    Uses IO from the cats library which is equivalent to Task.
-//    Creating a Http1Client requires implicit F: Effect[F]
-//    This comes for free with IO
-    val httpClientF: IO[Client[IO]] = Http1Client[IO]()
-
-//    I don't see a way to do this without implementing Effect[Task]
-//    implicit val taskEffect: Effect[Task] = ???
-
-//    In the case of Task There is no Effect[Task] provided. Implement this manually?
-    val httpClientF2: Task[String] = Http1Client[Task]()
-      .flatMap(f => f.expect[String](url))
-
-    ???
+    for {
+      client <- Http1Client[Task]()
+      apiResponse <- client.expect(url)(jsonOf[Task, NewsApiResponse])
+    } yield apiResponse.articles.head
   }
 
 }
